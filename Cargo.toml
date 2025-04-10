@@ -1,0 +1,18 @@
+[package]
+name = "addition"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "addition"
+crate-type = ["staticlib"]
+
+[dependencies]
+mlua = { version = "0.10", features = ["lua53", "module"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+debug = true
+panic = "abort"

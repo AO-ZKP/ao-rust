@@ -1,14 +1,14 @@
 [package]
-name = "addition"
+name = "ao-rust"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "addition"
+name = "ao_rust"
 crate-type = ["staticlib"]
 
 [dependencies]
-mlua = { version = "0.10", features = ["lua53", "module"] }
+mlua = { git = 'https://github.com/AO-ZKP/mlua', branch = 'no-std-module', features = ["lua53", "module"], default-features = false }
 
 [profile.dev]
 panic = "abort"

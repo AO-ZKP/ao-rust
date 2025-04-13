@@ -39,7 +39,10 @@ pub fn eval_module(lua: &Lua) -> LuaResult<LuaFunction> {
                         mlua::Error::RuntimeError(msg) => msg,
                         _ => e.to_string(),
                     };
-                    outbox.set("Error", error_msg)?;
+                    // Set outbox.Error
+                    outbox.set("Error", error_msg.clone())?;
+                    // Set global Errors variable to store the last error
+                    lua.globals().set("Errors", error_msg)?;
                 }
             }
 

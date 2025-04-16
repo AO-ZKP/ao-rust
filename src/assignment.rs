@@ -2,7 +2,7 @@ use mlua::prelude::*;
 use alloc::string::{ToString, String};
 
 #[mlua::lua_module]
-fn assignment(lua: &Lua) -> LuaResult<LuaTable> {
+pub fn assignment(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;
     exports.set("_version", "0.1.0")?;
     exports.set("init", lua.create_function(init)?)?;

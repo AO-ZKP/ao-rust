@@ -23,7 +23,7 @@ fn get_data(lua: &Lua, tx_id: &str) -> LuaResult<Option<String>> {
 
 /// The boot module function, registered with Lua via the `mlua` crate.
 #[mlua::lua_module]
-fn boot(lua: &Lua) -> LuaResult<LuaFunction> {
+pub fn boot(lua: &Lua) -> LuaResult<LuaFunction> {
     let require: LuaFunction = lua.globals().get("require")?;
     let eval_module: LuaFunction = require.call("eval")?;
     let boot_fn = move |lua: &Lua, ao: LuaTable| {

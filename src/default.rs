@@ -11,7 +11,7 @@ const RESET: &str = "\x1b[0m";
 /// Registers the `default` module with Lua, providing a default message handler.
 /// This handler formats and prints incoming messages, inserting them into the inbox.
 #[mlua::lua_module]
-fn default(lua: &Lua) -> LuaResult<LuaFunction> {
+pub fn default(lua: &Lua) -> LuaResult<LuaFunction> {
     let default_fn = move |lua: &Lua, insert_inbox: LuaFunction| {
         let handler = move |lua: &Lua, msg: LuaTable| {
             // Insert the message into the inbox

@@ -4,19 +4,27 @@ const VERSION: &str = "0.0.1";
 
 #[mlua::lua_module(name = "utils")]
 pub fn utils(lua: &Lua) -> LuaResult<LuaTable> {
-    // Load the existing utils.lua
-    let require: LuaFunction = lua.globals().get("require")?;
-    let utils_table: LuaTable = require.call(".utils")?;
+    let exports = lua.create_table()?;
 
-    utils_table.set("_version", VERSION)?;
-    utils_table.set("matchesSpec", lua.create_function(matches_spec)?)?;
-    utils_table.set("matchesPattern", lua.create_function(matches_pattern)?)?;
-    utils_table.set("isArray", lua.create_function(is_array)?)?;
-    utils_table.set("curry", lua.create_function(curry)?)?;
-    utils_table.set("concat", lua.create_function(concat)?)?;
-    utils_table.set("reduce", lua.create_function(reduce)?)?;
+    exports.set("_version", VERSION)?;
+    exports.set("matchesSpec", lua.create_function(matches_spec)?)?;
+    exports.set("matchesPattern", lua.create_function(matches_pattern)?)?;
+    exports.set("isArray", lua.create_function(is_array)?)?;
+    exports.set("curry", lua.create_function(curry)?)?;
+    exports.set("concat", lua.create_function(concat)?)?;
+    exports.set("reduce", lua.create_function(reduce)?)?;
+    exports.set("map", lua.create_function(map)?)?;
+    exports.set("filter", lua.create_function(filter)?)?;
+    exports.set("find", lua.create_function(find)?)?;
+    exports.set("propEq", lua.create_function(prop_eq)?)?;
+    exports.set("reverse", lua.create_function(reverse)?)?;
+    exports.set("compose", lua.create_function(compose)?)?;
+    exports.set("prop", lua.create_function(prop)?)?;
+    exports.set("includes", lua.create_function(includes)?)?;
+    exports.set("keys", lua.create_function(keys)?)?;
+    exports.set("values", lua.create_function(values)?)?;
 
-    Ok(utils_table)
+    Ok(exports)
 }
 
 pub fn matches_spec(lua: &Lua, (msg, spec): (LuaTable, LuaValue)) -> LuaResult<LuaValue> {
@@ -250,4 +258,187 @@ fn reduce(lua: &Lua, fn_val: LuaFunction) -> LuaResult<LuaFunction> {
         lua.create_function(reduce_table)
     };
     lua.create_function(reduce_initial)
+}
+
+// New functions
+fn map(lua: &Lua, fn_val: LuaFunction) -> LuaResult<LuaFunction> {
+    let map_inner = move |lua: &Lua, data: LuaTable| {
+        if !is_array(lua, LuaValue::Table(data.clone()))? {
+            return Err(LuaError::RuntimeError(
+                "second argument should be a table that is an array".to_string(),
+            ));
+        }
+
+        let result = lua.create_table()?;
+        for i in 1..=data.len()? {
+            let value: LuaValue = data.get(i)?;
+            let mapped_value: LuaValue = fn_val.call((value, i))?;
+            result.set(i, mapped_value)?;
+        }
+        Ok(result)
+    };
+
+    lua.create_function(map_inner)
+}
+
+fn filter(lua: &Lua, fn_val: LuaFunction) -> LuaResult<LuaFunction> {
+    let filter_inner = move |lua: &Lua, data: LuaTable| {
+        if !is_array(lua, LuaValue::Table(data.clone()))? {
+            return Err(LuaError::RuntimeError(
+                "second argument should be a table that is an array".to_string(),
+            ));
+        }
+
+        let result = lua.create_table()?;
+        let mut index = 1;
+        for i in 1..=data.len()? {
+            let value: LuaValue = data.get(i)?;
+            let predicate_result: bool = fn_val.call(value.clone())?;
+            if predicate_result {
+                result.set(index, value)?;
+                index += 1;
+            }
+        }
+        Ok(result)
+    };
+
+    lua.create_function(filter_inner)
+}
+
+fn find(lua: &Lua, fn_val: LuaFunction) -> LuaResult<LuaFunction> {
+    let find_inner = move |lua: &Lua, t: LuaTable| {
+        if !is_array(lua, LuaValue::Table(t.clone()))? {
+            return Err(LuaError::RuntimeError(
+                "second argument should be a table that is an array".to_string(),
+            ));
+        }
+
+        for i in 1..=t.len()? {
+            let value: LuaValue = t.get(i)?;
+            let predicate_result: bool = fn_val.call(value.clone())?;
+            if predicate_result {
+                return Ok(value);
+            }
+        }
+        Ok(LuaValue::Nil)
+    };
+
+    lua.create_function(find_inner)
+}
+
+fn prop_eq(lua: &Lua, prop_name: LuaString) -> LuaResult<LuaFunction> {
+    let prop_eq_value = move |lua: &Lua, value: LuaString| {
+        let prop_name_clone = prop_name.clone(); // Clone before capture
+        let value_clone = value.clone(); // Clone before capture
+        let prop_eq_object = move |_lua: &Lua, object: LuaTable| {
+            let prop_value: LuaValue = object.get(prop_name_clone.clone())?;
+            if let LuaValue::String(s) = prop_value {
+                Ok(s.to_str()? == value_clone.to_str()?)
+            } else {
+                Ok(false)
+            }
+        };
+        lua.create_function(prop_eq_object)
+    };
+    lua.create_function(prop_eq_value)
+}
+
+fn reverse(lua: &Lua, data: LuaTable) -> LuaResult<LuaTable> {
+    if !is_array(lua, LuaValue::Table(data.clone()))? {
+        return Err(LuaError::RuntimeError(
+            "argument should be a table that is an array".to_string(),
+        ));
+    }
+
+    let len = data.len()?;
+    let result = lua.create_table()?;
+    for i in 1..=len {
+        let value: LuaValue = data.get(i)?;
+        result.set(len - i + 1, value)?;
+    }
+    Ok(result)
+}
+
+fn compose(lua: &Lua, functions: LuaMultiValue) -> LuaResult<LuaFunction> {
+    let mut funcs: Vec<LuaFunction> = functions
+        .into_iter()
+        .map(|v| {
+            if let LuaValue::Function(f) = v {
+                Ok(f)
+            } else {
+                Err(LuaError::RuntimeError(
+                    "each argument needs to be a function".to_string(),
+                ))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    funcs.reverse();
+
+    let composed = move |_lua: &Lua, v: LuaValue| {
+        let mut result = v;
+        for func in &funcs {
+            result = func.call(result)?;
+        }
+        Ok(result)
+    };
+
+    lua.create_function(composed)
+}
+
+fn prop(lua: &Lua, prop_name: LuaString) -> LuaResult<LuaFunction> {
+    let prop_inner = move |_lua: &Lua, object: LuaTable| -> LuaResult<LuaValue> {
+        object.get(prop_name.clone())
+    };
+    lua.create_function(prop_inner)
+}
+
+fn includes(lua: &Lua, val: LuaValue) -> LuaResult<LuaFunction> {
+    let includes_inner = move |lua: &Lua, t: LuaTable| {
+        if !is_array(lua, LuaValue::Table(t.clone()))? {
+            return Err(LuaError::RuntimeError(
+                "argument should be a table that is an array".to_string(),
+            ));
+        }
+        for i in 1..=t.len()? {
+            let element: LuaValue = t.get(i)?;
+            if element == val {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    };
+    lua.create_function(includes_inner)
+}
+
+fn keys(lua: &Lua, t: LuaTable) -> LuaResult<LuaTable> {
+    if !matches!(t.metatable(), None) {
+        return Err(LuaError::RuntimeError(
+            "argument needs to be a table".to_string(),
+        ));
+    }
+    let result = lua.create_table()?;
+    let mut index = 1;
+    for pair in t.pairs::<LuaValue, LuaValue>() {
+        let (key, _) = pair?;
+        result.set(index, key)?;
+        index += 1;
+    }
+    Ok(result)
+}
+
+fn values(lua: &Lua, t: LuaTable) -> LuaResult<LuaTable> {
+    if !matches!(t.metatable(), None) {
+        return Err(LuaError::RuntimeError(
+            "argument needs to be a table".to_string(),
+        ));
+    }
+    let result = lua.create_table()?;
+    let mut index = 1;
+    for pair in t.pairs::<LuaValue, LuaValue>() {
+        let (_, value) = pair?;
+        result.set(index, value)?;
+        index += 1;
+    }
+    Ok(result)
 }

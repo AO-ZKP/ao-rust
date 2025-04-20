@@ -2,8 +2,8 @@
 
 //use mlua::prelude::*;
 extern crate alloc;
-// // Module declarations
-// mod helper;
+// Module declarations
+
 mod stringify;
 mod boot;
 mod eval;

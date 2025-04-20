@@ -21,7 +21,6 @@ const COLORS: Colors = Colors {
 };
 
 // Stringify module initialization
-// Note: Using "stringify" as the name; adjust registration if ".stringify" is required
 #[mlua::lua_module(name = "stringify")]
 pub fn stringify(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;

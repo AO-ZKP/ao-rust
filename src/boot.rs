@@ -1,4 +1,5 @@
 use super::*;
+use crate::eval::eval_module;
 
 /// Reads data from a file in the '/data/' directory using Lua's io library.
 /// Returns `Some(contents)` if successful, `None` if the file is not found,
@@ -22,10 +23,9 @@ fn get_data(lua: &Lua, tx_id: &str) -> LuaResult<Option<String>> {
 /// The boot module function, registered with Lua via the `mlua` crate.
 #[mlua::lua_module]
 pub fn boot(lua: &Lua) -> LuaResult<LuaFunction> {
-    let require: LuaFunction = lua.globals().get("require")?;
-    let eval_module: LuaFunction = require.call("eval")?;
-    let boot_fn = move |lua: &Lua, ao: LuaTable| {
-        let eval_handler: LuaFunction = eval_module.call(ao.clone())?;
+
+    let boot_fn = move |lua: &Lua, _ao: LuaTable| {
+        let eval_handler: LuaFunction = eval_module(lua)?;
         let handler = move |lua: &Lua, msg: LuaTable| {
             let inbox: LuaTable = lua.globals().get("Inbox")?;
             if inbox.len()? == 0 {

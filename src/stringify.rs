@@ -50,7 +50,7 @@ fn is_simple_array(_lua: &Lua, tbl: LuaTable) -> LuaResult<bool> {
 }
 
 // Format a table for display
-fn format(
+pub fn format(
     lua: &Lua,
     (tbl, indent, visited): (LuaTable, Option<i32>, Option<LuaTable>),
 ) -> LuaResult<String> {

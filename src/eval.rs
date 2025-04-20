@@ -1,4 +1,5 @@
 use super::*;
+use crate::stringify::format as format_fn;
 
 // Eval module initialization
 #[mlua::lua_module(name = "eval")]
@@ -66,9 +67,8 @@ fn handle_output(lua: &Lua, ao: &LuaTable, output: LuaValue) -> LuaResult<()> {
         // Set json field
         let json_value = match output {
             LuaValue::Table(ref t) => {
-                let stringify = require_module(lua, "stringify")?;
-                let format_fn: LuaFunction = stringify.get("format")?;
-                let formatted: String = format_fn.call((t.clone(), None::<i32>, None::<LuaTable>))?;
+                
+                let formatted: String = format_fn(lua, (t.clone(), None::<i32>, None::<LuaTable>))?;
                 LuaValue::String(lua.create_string(&formatted)?)
             }
             _ => LuaValue::String(lua.create_string("undefined")?),
@@ -94,19 +94,11 @@ fn handle_output(lua: &Lua, ao: &LuaTable, output: LuaValue) -> LuaResult<()> {
 fn format_value(lua: &Lua, value: LuaValue) -> LuaResult<LuaValue> {
     match value {
         LuaValue::Table(t) => {
-            let stringify = require_module(lua, "stringify")?;
-            let format_fn: LuaFunction = stringify.get("format")?;
-            let formatted: String = format_fn.call((t, None::<i32>, None::<LuaTable>))?;
+            let formatted: String = format_fn(lua, (t, None::<i32>, None::<LuaTable>))?;
             Ok(LuaValue::String(lua.create_string(&formatted)?))
         }
         other => Ok(other),
     }
-}
-
-// Helper to require a module
-fn require_module(lua: &Lua, name: &str) -> LuaResult<LuaTable> {
-    let require: LuaFunction = lua.globals().get("require")?;
-    require.call(name)
 }
 
 // Helper to call the global Prompt function

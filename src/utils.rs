@@ -1,12 +1,14 @@
 use super::*;
 
+const VERSION: &str = "0.0.1";
+
 #[mlua::lua_module(name = "utils")]
 pub fn utils(lua: &Lua) -> LuaResult<LuaTable> {
     // Load the existing utils.lua
     let require: LuaFunction = lua.globals().get("require")?;
     let utils_table: LuaTable = require.call(".utils")?;
 
-    // Override matchesSpec with Rust implementation
+    utils_table.set("_version", VERSION)?;
     utils_table.set("matchesSpec", lua.create_function(matches_spec)?)?;
     utils_table.set("matchesPattern", lua.create_function(matches_pattern)?)?;
 

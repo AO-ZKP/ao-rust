@@ -1,17 +1,17 @@
 #![no_std]
 
-use mlua::prelude::*;
-use alloc::string::{ToString, String};
 use alloc::format;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use mlua::prelude::*;
 
 extern crate alloc;
 // Module declarations
 
-mod stringify;
+mod assignment;
 mod boot;
+mod default;
 mod eval;
 mod pretty;
-mod default;
-mod assignment;
+mod stringify;
 mod utils;

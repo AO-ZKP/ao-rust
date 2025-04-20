@@ -67,7 +67,9 @@ pub fn format(
         for value in tbl.sequence_values::<LuaValue>() {
             let v = value?;
             let formatted = match v {
-                LuaValue::String(s) => format!("{}{}{}{}", COLORS.green, '"', s.to_str()?, COLORS.reset),
+                LuaValue::String(s) => {
+                    format!("{}{}{}{}", COLORS.green, '"', s.to_str()?, COLORS.reset)
+                }
                 _ => format!("{}{}{}", COLORS.blue, v.to_string()?, COLORS.reset),
             };
             result.push(formatted);
@@ -84,8 +86,12 @@ pub fn format(
                 if idx == array_index {
                     array_index += 1;
                     let formatted = match v {
-                        LuaValue::Table(ref t) => format(lua, (t.clone(), Some(indent + 2), Some(visited.clone())))?,
-                        LuaValue::String(ref s) => format!("{}{}{}{}", COLORS.green, '"', s.to_str()?, COLORS.reset),
+                        LuaValue::Table(ref t) => {
+                            format(lua, (t.clone(), Some(indent + 2), Some(visited.clone())))?
+                        }
+                        LuaValue::String(ref s) => {
+                            format!("{}{}{}{}", COLORS.green, '"', s.to_str()?, COLORS.reset)
+                        }
                         _ => format!("{}{}{}", COLORS.blue, v.to_string()?, COLORS.reset),
                     };
                     result.push(format!("{}{}", to_indent_child, formatted));
@@ -109,10 +115,15 @@ pub fn format(
                         format(lua, (t.clone(), Some(indent + 2), Some(visited.clone())))?
                     }
                 }
-                LuaValue::String(ref s) => format!("{}{}{}{}", COLORS.green, '"', s.to_str()?, COLORS.reset),
+                LuaValue::String(ref s) => {
+                    format!("{}{}{}{}", COLORS.green, '"', s.to_str()?, COLORS.reset)
+                }
                 _ => format!("{}{}{}", COLORS.blue, v.to_string()?, COLORS.reset),
             };
-            result.push(format!("{}{} = {}", to_indent_child, formatted_key, formatted_value));
+            result.push(format!(
+                "{}{} = {}",
+                to_indent_child, formatted_key, formatted_value
+            ));
         }
     }
 

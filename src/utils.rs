@@ -33,10 +33,14 @@ pub fn matches_spec(lua: &Lua, (msg, spec): (LuaTable, LuaValue)) -> LuaResult<L
                 let utils: LuaTable = require.call("utils")?;
                 let matches_pattern: LuaFunction = utils.get("matchesPattern")?;
                 let matches_msg = msg_value.map_or(false, |v| {
-                    matches_pattern.call((pattern.clone(), v, msg.clone())).unwrap_or(false)
+                    matches_pattern
+                        .call((pattern.clone(), v, msg.clone()))
+                        .unwrap_or(false)
                 });
                 let matches_tag = tag_value.map_or(false, |v| {
-                    matches_pattern.call((pattern.clone(), v, msg.clone())).unwrap_or(false)
+                    matches_pattern
+                        .call((pattern.clone(), v, msg.clone()))
+                        .unwrap_or(false)
                 });
                 if !matches_msg && !matches_tag {
                     return Ok(LuaValue::Boolean(false));

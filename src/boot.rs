@@ -16,14 +16,15 @@ fn get_data(lua: &Lua, tx_id: &str) -> LuaResult<Option<String>> {
             Ok(Some(contents))
         }
         LuaValue::Nil => Ok(None),
-        _ => Err(LuaError::RuntimeError("io.open returned unexpected value".to_string())),
+        _ => Err(LuaError::RuntimeError(
+            "io.open returned unexpected value".to_string(),
+        )),
     }
 }
 
 /// The boot module function, registered with Lua via the `mlua` crate.
 #[mlua::lua_module]
 pub fn boot(lua: &Lua) -> LuaResult<LuaFunction> {
-
     let boot_fn = move |lua: &Lua, _ao: LuaTable| {
         let eval_handler: LuaFunction = eval_module(lua)?;
         let handler = move |lua: &Lua, msg: LuaTable| {

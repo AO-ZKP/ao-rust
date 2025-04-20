@@ -33,7 +33,10 @@ pub fn default(lua: &Lua) -> LuaResult<LuaFunction> {
             let action: Option<String> = msg.get("Action")?;
             if let Some(act) = action {
                 let action_display = if act.len() > 20 { &act[0..20] } else { &act };
-                txt.push_str(&format!("{}Action = {}{}{}", GRAY, BLUE, action_display, RESET));
+                txt.push_str(&format!(
+                    "{}Action = {}{}{}",
+                    GRAY, BLUE, action_display, RESET
+                ));
             } else {
                 // Handle the Data field
                 let data: LuaValue = msg.get("Data")?;
@@ -45,12 +48,10 @@ pub fn default(lua: &Lua) -> LuaResult<LuaFunction> {
                             Ok(json_table) => {
                                 let encode: LuaResult<LuaFunction> = json_table.get("encode");
                                 match encode {
-                                    Ok(encode_fn) => {
-                                        match encode_fn.call::<LuaValue>(t) {
-                                            Ok(LuaValue::String(s)) => s.to_str()?.to_string(),
-                                            _ => "<unserializable>".to_string(),
-                                        }
-                                    }
+                                    Ok(encode_fn) => match encode_fn.call::<LuaValue>(t) {
+                                        Ok(LuaValue::String(s)) => s.to_str()?.to_string(),
+                                        _ => "<unserializable>".to_string(),
+                                    },
                                     _ => "<json encode unavailable>".to_string(),
                                 }
                             }
@@ -60,7 +61,11 @@ pub fn default(lua: &Lua) -> LuaResult<LuaFunction> {
                     LuaValue::Nil => "".to_string(),
                     _ => data.to_string()?, // Convert other types directly to string
                 };
-                let data_display = if data_str.len() > 20 { &data_str[0..20] } else { &data_str };
+                let data_display = if data_str.len() > 20 {
+                    &data_str[0..20]
+                } else {
+                    &data_str
+                };
                 txt.push_str(&format!("{}Data = {}{}{}", GRAY, BLUE, data_display, RESET));
             }
 

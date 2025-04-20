@@ -67,7 +67,6 @@ fn handle_output(lua: &Lua, ao: &LuaTable, output: LuaValue) -> LuaResult<()> {
         // Set json field
         let json_value = match output {
             LuaValue::Table(ref t) => {
-                
                 let formatted: String = format_fn(lua, (t.clone(), None::<i32>, None::<LuaTable>))?;
                 LuaValue::String(lua.create_string(&formatted)?)
             }

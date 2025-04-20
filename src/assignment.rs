@@ -23,7 +23,11 @@ fn init(lua: &Lua, ao: LuaTable) -> LuaResult<()> {
             Some(val) => {
                 let name = match first {
                     LuaValue::String(s) => s.to_str()?.to_string(),
-                    _ => return Err(LuaError::RuntimeError("MatchSpec name MUST be a string".to_string())),
+                    _ => {
+                        return Err(LuaError::RuntimeError(
+                            "MatchSpec name MUST be a string".to_string(),
+                        ))
+                    }
                 };
                 (Some(name), val)
             }
@@ -67,7 +71,11 @@ fn init(lua: &Lua, ao: LuaTable) -> LuaResult<()> {
                     assignables.raw_remove(i as usize)?;
                 }
             }
-            _ => return Err(LuaError::RuntimeError("index MUST be a number or string".to_string())),
+            _ => {
+                return Err(LuaError::RuntimeError(
+                    "index MUST be a number or string".to_string(),
+                ))
+            }
         }
         Ok(())
     })?;
@@ -104,7 +112,12 @@ fn init(lua: &Lua, ao: LuaTable) -> LuaResult<()> {
     Ok(())
 }
 
-fn find_index_by_prop(_lua: &Lua, array: LuaTable, prop: &str, value: LuaValue) -> LuaResult<Option<usize>> {
+fn find_index_by_prop(
+    _lua: &Lua,
+    array: LuaTable,
+    prop: &str,
+    value: LuaValue,
+) -> LuaResult<Option<usize>> {
     for i in 1..=array.len()? {
         let entry: LuaTable = array.get(i)?;
         let entry_prop: LuaValue = entry.get(prop)?;

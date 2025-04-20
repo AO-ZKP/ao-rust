@@ -12,6 +12,7 @@ mod assignment;
 mod boot;
 mod default;
 mod eval;
+mod handlers_utils;
 mod pretty;
 mod stringify;
 mod utils;

@@ -1,11 +1,6 @@
 // Use necessary items from alloc for no_std compatibility
 
-use alloc::format;
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-
-// Use mlua prelude for Lua integration
-use mlua::prelude::*;
+use super::*;
 
 // Version constant
 const VERSION: &str = "0.0.1";

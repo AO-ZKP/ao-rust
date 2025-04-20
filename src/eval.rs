@@ -1,7 +1,4 @@
-// Use necessary items from alloc for no_std compatibility
-use alloc::format;
-use alloc::string::{String, ToString};
-use mlua::prelude::*;
+use super::*;
 
 // Eval module initialization
 #[mlua::lua_module(name = "eval")]

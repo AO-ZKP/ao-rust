@@ -1,6 +1,4 @@
-use alloc::format;
-use alloc::string::String;
-use mlua::prelude::*;
+use super::*;
 
 /// Registers the `pretty` module with Lua, exporting `_version` and `tprint`.
 #[mlua::lua_module(name = "pretty")]

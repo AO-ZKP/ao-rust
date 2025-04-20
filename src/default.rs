@@ -1,6 +1,4 @@
-use mlua::prelude::*;
-use alloc::string::{ToString, String};
-use alloc::format;
+use super::*;
 
 // ANSI color codes matching the assumed Colors table in Lua
 const GRAY: &str = "\x1b[90m";

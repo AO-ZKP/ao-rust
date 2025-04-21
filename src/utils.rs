@@ -139,7 +139,7 @@ fn contains_special_chars(s: &str) -> bool {
     })
 }
 
-fn is_array(_lua: &Lua, table: LuaValue) -> LuaResult<bool> {
+pub fn is_array(_lua: &Lua, table: LuaValue) -> LuaResult<bool> {
     if let LuaValue::Table(tbl) = table {
         let mut max_index: i64 = 0;
         for pair in tbl.pairs::<LuaValue, LuaValue>() {

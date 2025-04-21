@@ -1,5 +1,5 @@
-
 use super::*;
+use crate::utils::is_array;
 
 /// Registers the `ao` module with Lua, initializing the `ao` table with fields and functions.
 #[mlua::lua_module]
@@ -121,6 +121,8 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("Nonce", LuaValue::Nil)?;
 
     // Set implemented Rust functions
+    ao_lua.set("clone", lua.create_function(clone)?)?;
+    ao_lua.set("normalize", lua.create_function(normalize)?)?;
     ao_lua.set("log", lua.create_function(log)?)?;
 
     Ok(ao_lua)
@@ -149,4 +151,79 @@ fn log(lua: &Lua, (ao, txt): (LuaTable, String)) -> LuaResult<()> {
 
     output_table.push(txt)?;
     Ok(())
+}
+
+fn includes(lua: &Lua, list: LuaTable) -> LuaResult<LuaFunction> {
+    let func = move |_lua: &Lua, key: LuaValue| -> LuaResult<bool> {
+        for pair in list.pairs::<i32, LuaValue>() {
+            let (_, list_key) = pair?;
+            if list_key == key {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    };
+    lua.create_function(func)
+}
+
+fn pad_zero32(_lua: &Lua, num: i64) -> LuaResult<String> {
+    Ok(format!("{:032}", num))
+}
+
+fn clone(lua: &Lua, (obj, seen): (LuaValue, Option<LuaTable>)) -> LuaResult<LuaValue> {
+    // Handle non-tables
+    if !matches!(obj, LuaValue::Table(_)) {
+        return Ok(obj);
+    }
+
+    let obj_table = match obj {
+        LuaValue::Table(t) => t,
+        _ => unreachable!(),
+    };
+
+    // Handle seen tables
+    let seen = seen.unwrap_or_else(|| lua.create_table().unwrap());
+    if let Ok(existing) = seen.get::<LuaValue>(LuaValue::Table(obj_table.clone())) {
+        return Ok(existing);
+    }
+
+    // Create new table and mark as seen
+    let res = lua.create_table()?;
+    seen.set(obj_table.clone(), res.clone())?;
+
+    // Copy key-value pairs recursively
+    for pair in obj_table.pairs::<LuaValue, LuaValue>() {
+        let (k, v) = pair?;
+        let cloned_key = clone(lua, (k, Some(seen.clone())))?;
+        let cloned_value = clone(lua, (v, Some(seen.clone())))?;
+        res.set(cloned_key, cloned_value)?;
+    }
+
+    // Copy metatable
+    if let Some(mt) = obj_table.metatable() {
+        res.set_metatable(Some(mt));
+    }
+
+    Ok(LuaValue::Table(res))
+}
+
+fn normalize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
+    let tags: LuaTable = msg.get("Tags")?;
+    let non_extractable_tags: LuaTable = lua
+        .globals()
+        .get::<LuaTable>("ao")?
+        .get("nonExtractableTags")?;
+    let includes_fn = includes(lua, non_extractable_tags)?;
+
+    for pair in tags.sequence_values::<LuaTable>() {
+        let tag = pair?;
+        let name: String = tag.get("name")?;
+        let includes_result: bool = includes_fn.call(name.clone())?;
+        if !includes_result {
+            let value: LuaValue = tag.get("value")?;
+            msg.set(name, value)?;
+        }
+    }
+
+    Ok(msg)
 }

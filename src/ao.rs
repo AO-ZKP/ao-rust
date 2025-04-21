@@ -123,6 +123,8 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     // Set implemented Rust functions
     ao_lua.set("clone", lua.create_function(clone)?)?;
     ao_lua.set("normalize", lua.create_function(normalize)?)?;
+    ao_lua.set("sanitize", lua.create_function(sanitize)?)?;
+    //ao_lua.set("init", lua.create_function(init)?)?;
     ao_lua.set("log", lua.create_function(log)?)?;
 
     Ok(ao_lua)
@@ -226,4 +228,31 @@ fn normalize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     }
 
     Ok(msg)
+}
+
+fn sanitize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
+    let cloned_value = clone(lua, (LuaValue::Table(msg), None))?;
+    let new_msg = match cloned_value {
+        LuaValue::Table(t) => t,
+        _ => {
+            return Err(LuaError::RuntimeError(
+                "Clone did not return a table".to_string(),
+            ))
+        }
+    };
+    let non_forwardable_tags: LuaTable = lua
+        .globals()
+        .get::<LuaTable>("ao")?
+        .get("nonForwardableTags")?;
+    let includes_fn = includes(lua, non_forwardable_tags)?;
+
+    for pair in new_msg.pairs::<LuaValue, LuaValue>() {
+        let (key, _) = pair?;
+        let includes_result: bool = includes_fn.call(&key)?;
+        if includes_result {
+            new_msg.set(key, LuaValue::Nil)?;
+        }
+    }
+
+    Ok(new_msg)
 }

@@ -124,7 +124,7 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("clone", lua.create_function(clone)?)?;
     ao_lua.set("normalize", lua.create_function(normalize)?)?;
     ao_lua.set("sanitize", lua.create_function(sanitize)?)?;
-    //ao_lua.set("init", lua.create_function(init)?)?;
+    ao_lua.set("init", lua.create_function(init)?)?;
     ao_lua.set("log", lua.create_function(log)?)?;
     ao_lua.set("clearOutbox", lua.create_function(clear_outbox)?)?;
     //ao_lua.set("send", lua.create_function(send)?)?;
@@ -133,6 +133,66 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     //ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
     //ao_lua.set("result", lua.create_function(result)?)?;
     Ok(ao_lua)
+}
+
+fn init(lua: &Lua, env: LuaTable) -> LuaResult<()> {
+    let ao: LuaTable = lua.globals().get("ao")?;
+
+    // Set ao.id if empty
+    let current_id: String = ao.get("id").unwrap_or_default();
+    if current_id.is_empty() {
+        let process: LuaTable = env.get("Process")?;
+        let new_id: String = process.get("Id")?;
+        ao.set("id", new_id)?;
+    }
+
+    // Set ao._module from Process.Tags
+    let current_module: String = ao.get("_module").unwrap_or_default();
+    if current_module.is_empty() {
+        let process: LuaTable = env.get("Process")?;
+        let tags: LuaTable = process.get("Tags")?;
+        
+        for pair in tags.pairs::<i32, LuaTable>() {
+            let (_, tag) = pair?;
+            let name: String = tag.get("name")?;
+            if name == "Module" {
+                let value: String = tag.get("value")?;
+                ao.set("_module", value)?;
+                break;
+            }
+        }
+    }
+
+    // Populate authorities if empty
+    let authorities: LuaTable = ao.get("authorities")?;
+    if authorities.len()? == 0 {
+        let process: LuaTable = env.get("Process")?;
+        let tags: LuaTable = process.get("Tags")?;
+        let new_authorities = lua.create_table()?;
+
+        for pair in tags.pairs::<i32, LuaTable>() {
+            let (_, tag) = pair?;
+            let name: String = tag.get("name")?;
+            if name == "Authority" {
+                let value: String = tag.get("value")?;
+                new_authorities.push(value)?;
+            }
+        }
+        ao.set("authorities", new_authorities)?;
+    }
+
+    // Initialize outbox with pure Lua tables
+    let outbox = lua.create_table()?;
+    outbox.set("Output", lua.create_table()?)?;
+    outbox.set("Messages", lua.create_table()?)?;
+    outbox.set("Spawns", lua.create_table()?)?;
+    outbox.set("Assignments", lua.create_table()?)?;
+    ao.set("outbox", outbox)?;
+
+    // Store environment reference
+    ao.set("env", env)?;
+
+    Ok(())
 }
 
 /// Logs a message to the output, replacing the Lua version of ao.log.

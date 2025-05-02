@@ -4,16 +4,15 @@ SCRIPT_NAME=$(basename "$0")
 OUTPUT_FILE="codebase.md"
 rm -f "$OUTPUT_FILE"
 
-echo "# Codebase Contents" > "$OUTPUT_FILE"
+echo "<codebase>" > "$OUTPUT_FILE"
 
 echo "Starting script at $(date)"
 
 # Generate tree structure
 echo "Generating tree structure..."
-echo "## Project Structure" >> "$OUTPUT_FILE"
-echo '```' >> "$OUTPUT_FILE"
-tree -I ".git|$OUTPUT_FILE|$SCRIPT_NAME" --gitignore >> "$OUTPUT_FILE"
-echo '```' >> "$OUTPUT_FILE"
+echo "<project_structure>" >> "$OUTPUT_FILE"
+tree -I ".git|$OUTPUT_FILE|$SCRIPT_NAME" -a --gitignore >> "$OUTPUT_FILE"
+echo "</project_structure>" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
 # Function to check if a file is NOT a binary/image file
@@ -24,21 +23,22 @@ is_valid_text_file() {
 echo "Processing files..."
 
 # Use tree to list files, respecting .gitignore, and remove leading './'
-tree -if --noreport --gitignore | sed 's|^./||' | while read -r file; do
+tree -if -I ".git|$OUTPUT_FILE|$SCRIPT_NAME" -a --gitignore | sed 's|^./||' | while read -r file; do
     # Skip directories and excluded files
     if [ -f "$file" ] && [ "$file" != "$OUTPUT_FILE" ] && [ "$file" != "$SCRIPT_NAME" ]; then
         if is_valid_text_file "$file"; then
             echo "Adding $file"
-            echo "## File: $file" >> "$OUTPUT_FILE"
-            echo '```' >> "$OUTPUT_FILE"
+            echo "<file src=\"$file\">" >> "$OUTPUT_FILE"
             cat "$file" >> "$OUTPUT_FILE"
-            echo -e '\n```' >> "$OUTPUT_FILE"
+            echo "</file>" >> "$OUTPUT_FILE"
             echo "" >> "$OUTPUT_FILE"
         else
             echo "Skipping $file (likely binary or image file)"
         fi
     fi
 done
+
+echo "</codebase>" >> "$OUTPUT_FILE"
 
 echo "File processing completed at $(date)"
 

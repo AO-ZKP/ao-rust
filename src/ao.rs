@@ -126,7 +126,8 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("sanitize", lua.create_function(sanitize)?)?;
     //ao_lua.set("init", lua.create_function(init)?)?;
     ao_lua.set("log", lua.create_function(log)?)?;
-    //ao_lua.set("clearOutbox", lua.create_function(clearOutbox)?)?;
+    // ao_lua.set("clearOutbox", lua.create_function(clear_outbox)?)?;
+    register_clear_outbox(lua, &ao_lua)?;
     //ao_lua.set("send", lua.create_function(send)?)?;
     //ao_lua.set("spawn", lua.create_function(spawm)?)?;
     //ao_lua.set("assign", lua.create_function(assign)?)?;
@@ -157,6 +158,25 @@ fn log(lua: &Lua, (ao, txt): (LuaTable, String)) -> LuaResult<()> {
     };
 
     output_table.push(txt)?;
+    Ok(())
+}
+
+fn clear_outbox(lua: &Lua, ao: LuaTable) -> LuaResult<()> {
+    let outbox = lua.create_table()?;
+    
+    // Create pure Lua tables using metatable-free creation
+    let output = lua.create_table()?;
+    let messages = lua.create_table()?;
+    let spawns = lua.create_table()?;
+    let assignments = lua.create_table()?;
+    
+    // Avoid setting any metatables
+    outbox.set("Output", output)?;
+    outbox.set("Messages", messages)?;
+    outbox.set("Spawns", spawns)?;
+    outbox.set("Assignments", assignments)?;
+    
+    ao.set("outbox", outbox)?;
     Ok(())
 }
 
@@ -261,3 +281,17 @@ fn sanitize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
 
     Ok(new_msg)
 }
+
+fn register_clear_outbox(lua: &Lua, ao_table: &LuaTable) -> LuaResult<()> {
+    let clear_fn = lua.create_function(clear_outbox)?;
+    
+    // Create a type-erased wrapper that appears as Lua function
+    let wrapped = lua.create_function(move |lua, ()| -> LuaResult<()> {
+        let ao: LuaTable = lua.globals().get("ao")?;
+        clear_fn.call(ao)
+    })?;
+    
+    ao_table.set("clearOutbox", wrapped)?;
+    Ok(())
+}
+

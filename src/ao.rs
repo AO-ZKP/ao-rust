@@ -128,7 +128,7 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("log", lua.create_function(log)?)?;
     ao_lua.set("clearOutbox", lua.create_function(clear_outbox)?)?;
     ao_lua.set("send", lua.create_function(send)?)?;
-    //ao_lua.set("spawn", lua.create_function(spawm)?)?;
+    //ao_lua.set("spawn", lua.create_function(spawn)?)?;
     //ao_lua.set("assign", lua.create_function(assign)?)?;
     ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
     ao_lua.set("result", lua.create_function(result)?)?;

@@ -129,7 +129,7 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("clearOutbox", lua.create_function(clear_outbox)?)?;
     ao_lua.set("send", lua.create_function(send)?)?;
     //ao_lua.set("spawn", lua.create_function(spawn)?)?;
-    //ao_lua.set("assign", lua.create_function(assign)?)?;
+    ao_lua.set("assign", lua.create_function(assign)?)?;
     ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
     ao_lua.set("result", lua.create_function(result)?)?;
     Ok(ao_lua)
@@ -462,6 +462,37 @@ fn sanitize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     }
 
     Ok(new_msg)
+}
+
+fn assign(lua: &Lua, assignment: LuaTable) -> LuaResult<()> {
+    // Get the global assert function
+    let lua_assert: LuaFunction = lua.globals().get("assert")?;
+    let type_fn: LuaFunction = lua.globals().get("type")?;
+    
+    // Check that assignment is a table
+    let assignment_type: String = type_fn.call(assignment.clone())?;
+    lua_assert.call::<()>((assignment_type == "table", "assignment should be a table"))?;
+    
+    // Check that assignment.Processes is a table
+    let processes: LuaValue = assignment.get("Processes")?;
+    let processes_type: String = type_fn.call(processes)?;
+    lua_assert.call::<()>((processes_type == "table", "Processes should be a table"))?;
+    
+    // Check that assignment.Message is a string
+    let message: LuaValue = assignment.get("Message")?;
+    let message_type: String = type_fn.call(message)?;
+    lua_assert.call::<()>((message_type == "string", "Message should be a string"))?;
+    
+    // Get the ao table and its outbox
+    let ao: LuaTable = lua.globals().get("ao")?;
+    let outbox: LuaTable = ao.get("outbox")?;
+    let assignments: LuaTable = outbox.get("Assignments")?;
+    
+    // Insert the new assignment
+    let new_index = assignments.len()? + 1;
+    assignments.set(new_index, assignment)?;
+    
+    Ok(())
 }
 
 fn is_trusted(lua: &Lua, msg: LuaTable) -> LuaResult<bool> {

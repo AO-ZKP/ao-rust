@@ -127,7 +127,7 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("init", lua.create_function(init)?)?;
     ao_lua.set("log", lua.create_function(log)?)?;
     ao_lua.set("clearOutbox", lua.create_function(clear_outbox)?)?;
-    //ao_lua.set("send", lua.create_function(send)?)?;
+    ao_lua.set("send", lua.create_function(send)?)?;
     //ao_lua.set("spawn", lua.create_function(spawm)?)?;
     //ao_lua.set("assign", lua.create_function(assign)?)?;
     //ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
@@ -235,6 +235,118 @@ fn clear_outbox(lua: &Lua, _: ()) -> LuaResult<()> {
     Ok(())
 }
 
+fn send(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
+    let ao: LuaTable = lua.globals().get("ao")?;
+    
+    // 1. Message validation
+    let lua_assert: LuaFunction = lua.globals().get("assert")?;
+    let type_fn: LuaFunction = lua.globals().get("type")?;
+    let msg_type: String = type_fn.call::<String>(msg.clone())?;
+    lua_assert.call::<()>((msg_type == "table", "msg should be a table"))?;
+
+    // 2. Reference increment
+    let mut reference: i64 = ao.get("reference")?;
+    reference += 1;
+    ao.set("reference", reference)?;
+    let reference_str = reference.to_string();
+
+    // 3. Create base message
+    let message = lua.create_table()?;
+    message.set("Target", msg.get::<String>("Target")?)?;
+    message.set("Data", msg.get::<LuaValue>("Data")?)?;
+    message.set("Anchor", pad_zero32(reference)?)?;
+
+    // 4. Create tags array
+    let tags = lua.create_table()?;
+    tags.set(1, create_tag(lua, "Data-Protocol", "ao")?)?;
+    tags.set(2, create_tag(lua, "Variant", "ao.TN.1")?)?;
+    tags.set(3, create_tag(lua, "Type", "Message")?)?;
+    tags.set(4, create_tag(lua, "Reference", &reference_str)?)?;
+
+    // 5. Process custom tags
+    for pair_result in msg.pairs::<LuaValue, LuaValue>() {
+        let (key_value, val_value) = pair_result?;
+        let key = key_value.to_string()?;
+        if !["Target", "Data", "Anchor", "Tags", "From"].contains(&&*key) {
+            let value = val_value.to_string()?;
+            tags.set(tags.len()? + 1, create_tag(lua, &key, &value)?)?;
+        }
+    }
+
+    // 6. Handle msg.Tags
+    if let Ok(msg_tags) = msg.get::<LuaTable>("Tags") {
+        if is_array(lua, LuaValue::Table(msg_tags.clone()))? {
+            for pair in msg_tags.sequence_values::<LuaTable>() {
+                tags.set(tags.len()? + 1, pair?)?;
+            }
+        } else {
+            for pair_result in msg_tags.pairs::<LuaValue, LuaValue>() {
+                let (key, value) = pair_result?;
+                tags.set(tags.len()? + 1, create_tag(lua, &key.to_string()?, &value.to_string()?)?)?;
+            }
+        }
+    }
+    message.set("Tags", tags)?;
+
+    // 7. Early return if no Handlers
+    if lua.globals().get::<LuaTable>("Handlers").is_err() {
+        return Ok(message);
+    }
+
+    // 8. Add to outbox
+    let ext_message = lua.create_table()?;
+    for pair_result in message.pairs::<LuaValue, LuaValue>() {
+        let (key, value) = pair_result?;
+        ext_message.set(key, value)?;
+    }
+    let outbox: LuaTable = ao.get("outbox")?;
+    outbox.get::<LuaTable>("Messages")?.set(outbox.len()? + 1, ext_message)?;
+
+    // 9. Implement onReply
+    let message_clone = message.clone();
+    let reference_str_clone = reference_str.clone();
+    message.set("onReply", lua.create_function(move |lua, args: LuaMultiValue| {
+        let handlers: LuaTable = lua.globals().get("Handlers")?;
+        let (from, resolver) = match args.len() {
+            2 => (args[0].clone(), args[1].clone()),
+            _ => (message_clone.get::<String>("Target")?.into_lua(lua)?, args[0].clone())
+        };
+
+        let params = lua.create_table()?;
+        params.set("From", from)?;
+        params.set("X-Reference", &*reference_str_clone)?;
+        handlers.get::<LuaFunction>("once")?.call::<()>((params, resolver))?;
+        Ok(())
+    })?)?;
+
+    // 10. Implement receive
+    let message_clone = message.clone();
+    let reference_str_clone = reference_str.clone();
+    message.set("receive", lua.create_function(move |lua, args: LuaMultiValue| -> LuaResult<LuaMultiValue> {
+        let handlers: LuaTable = lua.globals().get("Handlers")?;
+        let from = match args.len() {
+            1 => args[0].clone(),
+            _ => message_clone.get::<String>("Target")?.into_lua(lua)?
+        };
+
+        let params = lua.create_table()?;
+        params.set("From", from)?;
+        params.set("X-Reference", &*reference_str_clone)?;
+        handlers.get::<LuaFunction>("receive")?.call(params)
+    })?)?;
+
+    Ok(message)
+}
+
+// Helper function
+fn create_tag(lua: &Lua, name: &str, value: &str) -> LuaResult<LuaTable> {
+    let tag = lua.create_table()?;
+    tag.set("name", name)?;
+    tag.set("value", value)?;
+    Ok(tag)
+}
+
+
 fn includes(lua: &Lua, list: LuaTable) -> LuaResult<LuaFunction> {
     let func = move |_lua: &Lua, key: LuaValue| -> LuaResult<bool> {
         for pair in list.pairs::<i32, LuaValue>() {
@@ -248,7 +360,7 @@ fn includes(lua: &Lua, list: LuaTable) -> LuaResult<LuaFunction> {
     lua.create_function(func)
 }
 
-fn pad_zero32(_lua: &Lua, num: i64) -> LuaResult<String> {
+fn pad_zero32(num: i64) -> LuaResult<String> {
     Ok(format!("{:032}", num))
 }
 

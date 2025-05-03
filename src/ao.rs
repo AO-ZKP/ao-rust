@@ -130,8 +130,8 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("send", lua.create_function(send)?)?;
     //ao_lua.set("spawn", lua.create_function(spawm)?)?;
     //ao_lua.set("assign", lua.create_function(assign)?)?;
-    //ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
-    //ao_lua.set("result", lua.create_function(result)?)?;
+    ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
+    ao_lua.set("result", lua.create_function(result)?)?;
     Ok(ao_lua)
 }
 
@@ -464,3 +464,43 @@ fn sanitize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     Ok(new_msg)
 }
 
+fn is_trusted(lua: &Lua, msg: LuaTable) -> LuaResult<bool> {
+    let ao: LuaTable = lua.globals().get("ao")?;
+    let authorities: LuaTable = ao.get("authorities")?;
+    
+    let from: Option<String> = msg.get("From")?;
+    let owner: Option<String> = msg.get("Owner")?;
+    
+    for i in 1..=authorities.len()? {
+        let authority: String = authorities.get(i)?;
+        if from.as_ref() == Some(&authority) || owner.as_ref() == Some(&authority) {
+            return Ok(true);
+        }
+    }
+    
+    Ok(false)
+}
+
+fn result(lua: &Lua, res: LuaTable) -> LuaResult<LuaTable> {
+    let ao: LuaTable = lua.globals().get("ao")?;
+    let outbox: LuaTable = ao.get("outbox")?;
+    
+    // Check for errors first
+    let error_msg: Option<String> = res.get("Error")?;
+    let outbox_error: Option<String> = outbox.get("Error")?;
+    
+    if error_msg.is_some() || outbox_error.is_some() {
+        let error_table = lua.create_table()?;
+        error_table.set("Error", error_msg.or(outbox_error))?;
+        return Ok(error_table);
+    }
+    
+    // No errors, return full result
+    let result_table = lua.create_table()?;
+    result_table.set("Output", res.get::<Option<LuaValue>>("Output")?.unwrap_or_else(|| outbox.get("Output").unwrap_or(LuaValue::Nil)))?;
+    result_table.set("Messages", outbox.get::<LuaTable>("Messages")?)?;
+    result_table.set("Spawns", outbox.get::<LuaTable>("Spawns")?)?;
+    result_table.set("Assignments", outbox.get::<LuaTable>("Assignments")?)?;
+    
+    Ok(result_table)
+}

@@ -256,14 +256,19 @@ fn send(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     message.set("Data", msg.get::<LuaValue>("Data")?)?;
     message.set("Anchor", pad_zero32(reference)?)?;
 
-    // Initialize Tags table with default tags
+    // Initialize Tags table
     let tags = lua.create_table()?;
-    let table_mod: LuaTable = lua.globals().get("table")?;
-    let insert_fn: LuaFunction = table_mod.get("insert")?;
-    insert_fn.call::<()>((tags.clone(), create_tag(lua, "Data-Protocol", "ao")?))?;
-    insert_fn.call::<()>((tags.clone(), create_tag(lua, "Variant", "ao.TN.1")?))?;
-    insert_fn.call::<()>((tags.clone(), create_tag(lua, "Type", "Message")?))?;
-    insert_fn.call::<()>((tags.clone(), create_tag(lua, "Reference", &reference_str)?))?;
+    let mut tag_index = 1;
+
+    // Add default tags
+    tags.set(tag_index, create_tag(lua, "Data-Protocol", "ao")?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Variant", "ao.TN.1")?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Type", "Message")?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Reference", &reference_str)?)?;
+    tag_index += 1;
 
     // Add custom tags from msg root
     for pair_result in msg.pairs::<LuaValue, LuaValue>() {
@@ -271,7 +276,8 @@ fn send(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
         let key = key_value.to_string()?;
         if !["Target", "Data", "Anchor", "Tags", "From"].contains(&&*key) {
             let value = val_value.to_string()?;
-            insert_fn.call::<()>((tags.clone(), create_tag(lua, &key, &value)?))?;
+            tags.set(tag_index, create_tag(lua, &key, &value)?)?;
+            tag_index += 1;
         }
     }
 
@@ -280,13 +286,15 @@ fn send(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
         if is_array(lua, LuaValue::Table(msg_tags.clone()))? {
             for pair in msg_tags.sequence_values::<LuaTable>() {
                 let o = pair?;
-                insert_fn.call::<()>((tags.clone(), o))?;
+                tags.set(tag_index, o)?;
+                tag_index += 1;
             }
         } else {
             for pair_result in msg_tags.pairs::<LuaValue, LuaValue>() {
                 let (k, v) = pair_result?;
                 let tag = create_tag(lua, &k.to_string()?, &v.to_string()?)?;
-                insert_fn.call::<()>((tags.clone(), tag))?;
+                tags.set(tag_index, tag)?;
+                tag_index += 1;
             }
         }
     }
@@ -307,7 +315,8 @@ fn send(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     // Add to ao.outbox.Messages
     let outbox: LuaTable = ao.get("outbox")?;
     let messages: LuaTable = outbox.get("Messages")?;
-    insert_fn.call::<()>((messages.clone(), ext_message))?;
+    let current_length = messages.len()?;
+    messages.set(current_length + 1, ext_message)?;
 
     // Add onReply function
     let message_clone = message.clone();

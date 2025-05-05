@@ -254,7 +254,7 @@ fn send(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     let message = lua.create_table()?;
     message.set("Target", msg.get::<String>("Target")?)?;
     message.set("Data", msg.get::<LuaValue>("Data")?)?;
-    message.set("Anchor", pad_zero32(reference)?)?;
+    message.set("Anchor", format!("{:032}", reference))?;
 
     // Initialize Tags table
     let tags = lua.create_table()?;
@@ -373,10 +373,6 @@ fn includes(lua: &Lua, list: LuaTable) -> LuaResult<LuaFunction> {
         Ok(false)
     };
     lua.create_function(func)
-}
-
-fn pad_zero32(num: i64) -> LuaResult<String> {
-    Ok(format!("{:032}", num))
 }
 
 fn clone(lua: &Lua, (obj, seen): (LuaValue, Option<LuaTable>)) -> LuaResult<LuaValue> {

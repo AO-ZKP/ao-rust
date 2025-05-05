@@ -128,7 +128,7 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     ao_lua.set("log", lua.create_function(log)?)?;
     ao_lua.set("clearOutbox", lua.create_function(clear_outbox)?)?;
     ao_lua.set("send", lua.create_function(send)?)?;
-    //ao_lua.set("spawn", lua.create_function(spawn)?)?;
+    ao_lua.set("spawn", lua.create_function(spawn)?)?;
     ao_lua.set("assign", lua.create_function(assign)?)?;
     ao_lua.set("isTrusted", lua.create_function(is_trusted)?)?;
     ao_lua.set("result", lua.create_function(result)?)?;
@@ -462,6 +462,126 @@ fn sanitize(lua: &Lua, msg: LuaTable) -> LuaResult<LuaTable> {
     }
 
     Ok(new_msg)
+}
+
+fn spawn(lua: &Lua, (module, msg): (String, LuaTable)) -> LuaResult<LuaTable> {
+    let ao: LuaTable = lua.globals().get("ao")?;
+
+    // Get and increment reference
+    let mut reference: i64 = ao.get("reference")?;
+    reference += 1;
+    ao.set("reference", reference)?;
+    let reference_str = reference.to_string();
+
+    // Create spawn table
+    let spawn = lua.create_table()?;
+    let default_str = lua.create_string("NODATA")?;
+    let data = msg.get("Data").unwrap_or_else(|_| LuaValue::String(default_str.clone()));
+    spawn.set("Data", data)?;
+    spawn.set("Anchor", format!("{:032}", reference))?;
+
+    // Create tags table
+    let tags = lua.create_table()?;
+    let mut tag_index = 1;
+    let create_tag = |lua: &Lua, name: &str, value: &str| -> LuaResult<LuaTable> {
+        let tag = lua.create_table()?;
+        tag.set("name", name)?;
+        tag.set("value", value)?;
+        Ok(tag)
+    };
+    tags.set(tag_index, create_tag(lua, "Data-Protocol", "ao")?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Variant", "ao.TN.1")?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Type", "Process")?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "From-Process", &ao.get::<String>("id").unwrap_or_default())?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "From-Module", &ao.get::<String>("_module").unwrap_or_default())?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Module", &module)?)?;
+    tag_index += 1;
+    tags.set(tag_index, create_tag(lua, "Reference", &reference_str)?)?;
+    tag_index += 1;
+
+    // Add custom tags from msg root
+    let excluded = ["Target", "Data", "Anchor", "Tags", "From"];
+    for pair in msg.pairs::<String, LuaValue>() {
+        let (key, value) = pair?;
+        if !excluded.contains(&key.as_str()) {
+            let value_str = match value {
+                LuaValue::Nil => String::from(""),
+                LuaValue::String(s) => s.to_str()?.to_string(),
+                _ => value.to_string()?,
+            };
+            tags.set(tag_index, create_tag(lua, &key, &value_str)?)?;
+            tag_index += 1;
+        }
+    }
+
+    // Handle msg.Tags
+    if let Ok(msg_tags) = msg.get::<LuaTable>("Tags") {
+        if crate::utils::is_array(lua, LuaValue::Table(msg_tags.clone()))? {
+            for pair in msg_tags.sequence_values::<LuaTable>() {
+                let tag = pair?;
+                tags.set(tag_index, tag)?;
+                tag_index += 1;
+            }
+        } else {
+            for pair in msg_tags.pairs::<String, LuaValue>() {
+                let (k, v) = pair?;
+                let value_str = match v {
+                    LuaValue::Nil => String::from(""),
+                    LuaValue::String(s) => s.to_str()?.to_string(),
+                    _ => v.to_string()?,
+                };
+                tags.set(tag_index, create_tag(lua, &k, &value_str)?)?;
+                tag_index += 1;
+            }
+        }
+    }
+    spawn.set("Tags", tags)?;
+
+    // Check for Handlers
+    let handlers: LuaValue = lua.globals().get("Handlers")?;
+    if handlers != LuaValue::Nil {
+        // Clone spawn for outbox
+        let ext_spawn = lua.create_table()?;
+        for pair in spawn.pairs::<LuaValue, LuaValue>() {
+            let (key, value) = pair?;
+            ext_spawn.set(key, value)?;
+        }
+        let outbox: LuaTable = ao.get("outbox")?;
+        let spawns: LuaTable = outbox.get("Spawns")?;
+        spawns.push(ext_spawn)?;
+
+        // Add onReply function
+        let reference_str_clone = reference_str.clone();
+        spawn.set("onReply", lua.create_function(move |lua, callback: LuaFunction| {
+            let handlers: LuaTable = lua.globals().get("Handlers")?;
+            let ao: LuaTable = lua.globals().get("ao")?;
+            let pattern = lua.create_table()?;
+            pattern.set("Action", "Spawned")?;
+            pattern.set("From", ao.get::<String>("id").unwrap_or_default())?;
+            pattern.set("Reference", reference_str_clone.clone())?;
+            handlers.get::<LuaFunction>("once")?.call::<()>((pattern, callback))?;
+            Ok(())
+        })?)?;
+
+        // Add receive function
+        let reference_str_clone = reference_str.clone();
+        spawn.set("receive", lua.create_function(move |lua, _: ()| -> LuaResult<LuaMultiValue> {
+            let handlers: LuaTable = lua.globals().get("Handlers")?;
+            let ao: LuaTable = lua.globals().get("ao")?;
+            let pattern = lua.create_table()?;
+            pattern.set("Action", "Spawned")?;
+            pattern.set("From", ao.get::<String>("id").unwrap_or_default())?;
+            pattern.set("Reference", reference_str_clone.clone())?;
+            handlers.get::<LuaFunction>("receive")?.call(pattern)
+        })?)?;
+    }
+
+    Ok(spawn)
 }
 
 fn assign(lua: &Lua, assignment: LuaTable) -> LuaResult<()> {

@@ -47,3 +47,37 @@ fn _find_index_by_prop(array: &LuaTable, prop: &str, value: &LuaValue) -> LuaRes
     }
     Ok(None)
 }
+
+fn _assert_add_args(
+    name: &str,
+    pattern: &mlua::Value,
+    handle: &mlua::Value,
+    max_runs: &mlua::Value,
+) -> mlua::Result<()> {
+    use mlua::Value::*;
+
+    let is_valid_pattern = matches!(
+        pattern,
+        LuaValue::Function(_) | LuaValue::Table(_) | LuaValue::String(_)
+    );
+    let is_valid_handle = matches!(handle, Function(_));
+    let is_valid_max_runs = match max_runs {
+        LuaValue::Nil => true,
+        LuaValue::Number(_) => true,
+        LuaValue::String(s) => s.to_str()? == "inf",
+        _ => false,
+    };
+
+    if name.is_empty() || !is_valid_pattern || !is_valid_handle || !is_valid_max_runs {
+        return Err(mlua::Error::RuntimeError(
+            "Invalid arguments given. Expected:\n\
+            \tname : string,\n\
+            \tpattern : Action : string | MsgMatch : table | function(msg: Message) : {-1 = break, 0 = skip, 1 = continue},\n\
+            \thandle(msg : Message) : void) | Resolver,\n\
+            \tMaxRuns? : number | \"inf\" | nil"
+                .to_string(),
+        ));
+    }
+
+    Ok(())
+}

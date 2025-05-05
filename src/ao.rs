@@ -12,9 +12,9 @@ pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
         Ok(table) => Some(table),
         Err(_) => Some(lua.create_table()?),
     };
-    
+
     let ao_lua = lua.create_table()?;
-    
+
     // Set static fields
     ao_lua.set("_version", "0.0.6")?;
 

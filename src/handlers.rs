@@ -37,3 +37,13 @@ pub fn handlers(lua: &Lua) -> LuaResult<LuaTable> {
 
     Ok(handlers_lua)
 }
+
+fn _find_index_by_prop(array: &LuaTable, prop: &str, value: &LuaValue) -> LuaResult<Option<i32>> {
+    for pair in array.pairs::<i32, LuaTable>() {
+        let (index, object) = pair?;
+        if object.get::<LuaValue>(prop)? == *value {
+            return Ok(Some(index));
+        }
+    }
+    Ok(None)
+}

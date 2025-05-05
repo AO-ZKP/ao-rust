@@ -2,4 +2,4 @@
 channel = "nightly"
 profile = "minimal"
 components = [ "rustfmt", "clippy", "rust-src" ]
-targets = ["wasm32-unknown-emscripten","wasm64-unknown-unknown"]
+targets = ["wasm32-unknown-emscripten"]

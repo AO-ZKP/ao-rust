@@ -17,3 +17,4 @@ mod handlers_utils;
 mod pretty;
 mod stringify;
 mod utils;
+mod handlers;

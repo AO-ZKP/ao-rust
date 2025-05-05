@@ -5,14 +5,16 @@ use crate::utils::is_array;
 #[mlua::lua_module]
 pub fn ao(lua: &Lua) -> LuaResult<LuaTable> {
     // load the ao module
-    let require: LuaFunction = lua.globals().get("require")?;
-    let ao_lua: LuaTable = require.call(".ao")?;
+    // let require: LuaFunction = lua.globals().get("require")?;
+    // let ao_lua: LuaTable = require.call(".ao")?;
 
     let oldao: Option<LuaTable> = match lua.globals().get::<LuaTable>("ao") {
         Ok(table) => Some(table),
         Err(_) => Some(lua.create_table()?),
     };
-
+    
+    let ao_lua = lua.create_table()?;
+    
     // Set static fields
     ao_lua.set("_version", "0.0.6")?;
 

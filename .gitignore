@@ -20,3 +20,4 @@ bin/
 *.zkey
 *.r1cs
 *.wtns
+.aider*

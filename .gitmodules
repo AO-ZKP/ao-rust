@@ -1,0 +1,4 @@
+[submodule "aos"]
+	path = aos
+	url = https://github.com/ao-zkp/aos
+	branch = rust-lib
